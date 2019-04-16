@@ -1,0 +1,24 @@
+# Syntax Coloring Map for Rob's Breakouts TLC59116 Library #
+
+# DataTyptes (KEYWORD1)
+TLC59116 KEYWORD1
+
+# Methods and Functions (KEYWORD2)
+channelOff KEYWORD2
+channelOn KEYWORD2
+channelPWM KEYWORD2
+channelGroup KEYWORD2
+setPWM KEYWORD2
+setGroupPWM KEYWORD2
+setGroupFreq KEYWORD2
+clearErrors KEYWORD2
+checkErrors KEYWORD2
+enableTLC KEYWORD2
+softReset KEYWORD2
+writeRegister KEYWORD2
+
+# Structures (KEYWORD3)
+
+# Constants (Literal1)
+
+# ? (Literal2)
