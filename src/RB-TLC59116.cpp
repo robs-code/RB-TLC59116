@@ -1,153 +1,169 @@
 #include "RB-TLC59116.h"
 
-const int TLC_ADDR = 0x60;
-const byte RESET_ADDR = 0x6B;
-const byte EFLAG1_ADDR = 0x1D;
-const byte EFLAG2_ADDR = 0x1E;
-const byte LEDOUT_ADDR = 0x14;
-const byte PWM_ADDR = 0x02;
-const byte PWM_GROUP_ADDR = 0x12;
-const byte FREQ_GROUP_ADDR = 0x12;
+// Register Addresses
+const byte TLC_PWM_BASE = 0x02;
+const byte TLC_GROUP_PWM = 0x12;
+const byte TLC_GROUP_FREQ = 0x13;
+const byte TLC_LED_OUTPUT_ADDR = 0x14;
+const byte TLC_ERROR_FLAG1 = 0x1D;
+const byte TLC_ERROR_FLAG2 = 0x1E;
+const byte TLC_RESET = 0x6B;
 
+// Possible LED Output States
 const byte LED_OFF = 0x00;
 const byte LED_ON = 0x01;
 const byte LED_PWM = 0x02;
 const byte LED_GROUP = 0x03;
 
-boolean groupMode = 0; // Group dimming(0) or blinking(1)
-byte LEDOUT[4] = { 0x00, 0x00, 0x00, 0x00 }; // Keep track of channel output modes
-
 //<<constructor>> setup the TLC59116
-TLC59116::TLC59116() {}
-
+TLC59116::TLC59116(int address, byte resetPin) : TLC_ADDR(address), RESET(resetPin) {
+  digitalWrite(RESET, HIGH);
+  boolean groupMode = 0; // Group dimming(0) or blinking(1)
+  byte LEDOUT[4] = { 0x00, 0x00, 0x00, 0x00 }; // Keep track of channel output modes
+  unsigned int ERR_FLAG = 0xFFFF;
+}
+  
 //<<destructor>>
 TLC59116::~TLC59116() {}
 
-void TLC59116::write2Register(byte reg, byte val)
+void TLC59116::writeToDevice(byte reg, byte newLEDOUT)
 {
   Wire.beginTransmission(TLC_ADDR);
   Wire.write(reg);
-  Wire.write(val);
+  Wire.write(newLEDOUT);
   Wire.endTransmission();
 }
 
-byte TLC59116::readFromRegister(byte reg)
+byte TLC59116::readFromDevice(byte reg)
 {
-  uint8_t result;
   Wire.beginTransmission(TLC_ADDR);
   Wire.write(reg);
-  Wire.endTransmission();
   Wire.requestFrom(TLC_ADDR, 1);
-  while (Wire.available()) result = Wire.read();
+  uint8_t result = Wire.read();
+  Wire.endTransmission();
   return result;
 }
 
 // Datasheet 9.5.6
 // --------------------------------------------------------------------
 // When modifying a channel output, maintain all other channel outputs.
-byte TLC59116::modLEDOUT(byte pos, byte regLoc, byte mod) {
+byte TLC59116::modifyLEDOutputState(byte LED, byte state) {
+  byte pos = ((LED % 4) * 2);
+  byte regLoc = LED / 4;
   byte mask = 0x03 << pos;
-  byte val;
+  byte newLEDOUT;
 
-  val = LEDOUT[regLoc] | mask;
-  val = LEDOUT[regLoc] & ~mask;
-  if (mod != 0x00) val = LEDOUT[regLoc] | (mod << pos);
-  LEDOUT[regLoc] = val;
+  newLEDOUT = LEDOUT[regLoc] | mask;
+  newLEDOUT = LEDOUT[regLoc] & ~mask;
+  if (state != 0x00) newLEDOUT = LEDOUT[regLoc] | (state << pos);
+  LEDOUT[regLoc] = newLEDOUT;
 
-  return val;
+  writeToDevice(TLC_LED_OUTPUT_ADDR + regLoc, newLEDOUT);
 }
 
-void TLC59116::channelOff(byte channel) {
-  byte pos = ((channel % 4) * 2);
-  byte regLoc = channel / 4;
-
-  write2Register(LEDOUT_ADDR + regLoc, modLEDOUT(pos, regLoc, LED_OFF));
+void TLC59116::LEDOff(byte LED) {
+  modifyLEDOutputState(LED, LED_OFF);
 }
 
-void TLC59116::channelOn(byte channel) {
-  byte pos = ((channel % 4) * 2);
-  byte regLoc = channel / 4;
-
-  write2Register(LEDOUT_ADDR + regLoc, modLEDOUT(pos, regLoc, LED_ON));
+void TLC59116::LEDOn(byte LED) {
+  modifyLEDOutputState(LED, LED_ON);
 }
 
-void TLC59116::channelPWM(byte channel) {
-  byte pos = ((channel % 4) * 2);
-  byte regLoc = channel / 4;
-
-  setPWM(channel, 255);
-  write2Register(LEDOUT_ADDR + regLoc, modLEDOUT(pos, regLoc, LED_PWM));
+void TLC59116::LEDPWM(byte LED) {
+  setPWM(LED, 255);
+  modifyLEDOutputState(LED, LED_PWM);
 }
 
-void TLC59116::channelGroup(byte channel) {
-  byte pos = ((channel % 4) * 2);
-  byte regLoc = channel / 4;
-
-  setPWM(channel, 255);
-  write2Register(LEDOUT_ADDR + regLoc, modLEDOUT(pos, regLoc, LED_GROUP));
+void TLC59116::LEDGroup(byte LED) {
+  setPWM(LED, 255);
+  modifyLEDOutputState(LED, LED_GROUP);
 }
 // --------------------------------------------------------------------
 
 // Datasheet 9.5.3
 void TLC59116::setPWM(byte pin, byte duty) {
-  write2Register(PWM_ADDR + pin, duty);
+  writeToDevice(TLC_PWM_BASE + pin, duty);
 }
 
 // Datasheet 9.5.4
 void TLC59116::setGroupPWM(byte duty) {
   if (groupMode == 1) {
-    write2Register(0x01, 0x00);
+    writeToDevice(0x01, 0x00);
     groupMode = 0;
   }
-  write2Register(PWM_GROUP_ADDR, duty);
+  writeToDevice(TLC_GROUP_PWM, duty);
 }
 
-void TLC59116::setGroupFreq(byte freq) {
+void TLC59116::setGroupBlink(byte freq, byte duty) {
+  setGroupPWM(duty);
   if (groupMode == 0) {
-    write2Register(0x01, 0x20);
+    writeToDevice(0x01, 0x20);
     groupMode = 1;
   }
 
-  write2Register(FREQ_GROUP_ADDR, freq);
+  writeToDevice(TLC_GROUP_FREQ, freq);
 }
 
 // Datasheet 9.5.2
 void TLC59116::clearErrors() {
-  write2Register(0x01, 0x80);
-  write2Register(0x01, 0x00);
+  writeToDevice(0x01, 0x80);
+  writeToDevice(0x01, 0x00);
 }
 
 // Datasheet 9.3.2 & 9.5.10
-unsigned int TLC59116::checkErrors(bool report) {
-  byte flag1 = readFromRegister(EFLAG1_ADDR);
-  byte flag2 = readFromRegister(EFLAG2_ADDR);
-  unsigned int flag = (flag2 << 8) + flag1;
+boolean TLC59116::checkErrors() {
+  byte flag1 = readFromDevice(TLC_ERROR_FLAG1);
+  byte flag2 = readFromDevice(TLC_ERROR_FLAG2);
+  Serial.println(flag1);
+  Serial.println(flag2);
+  ERR_FLAG = (flag2 << 8) + flag1;
 
-  if (report) {
-    if (flag == 0xFFFF)Serial.println("No errors detected.");
-    else {
-      for (byte i = 0; i < 16; i++) {
-        if (!((flag >> i) & 0x1)) {
-          Serial.print("Channel ");
-          Serial.print(i);
-          Serial.println(" overtemperature or open circuit.");
-        }
+  if (ERR_FLAG == 0xFFFF) return false;
+  return true;
+   
+}
+
+void TLC59116::reportErrors(){
+  if (ERR_FLAG == 0xFFFF) Serial.println("No errors detected.");
+  else {
+    Serial.println(ERR_FLAG, HEX);
+   for (byte i = 0; i < 16; i++) {
+    if (!((ERR_FLAG >> i) & 0x1)) {
+      Serial.print("Channel ");
+      Serial.print(i);
+      Serial.println(" overtemperature or open circuit.");
       }
     }
   }
-
-  return flag;
-}
-
-void TLC59116::enableTLC() {
-  write2Register(0x00, 0x80);
-
-  //Reset Error Flags
   clearErrors();
 }
 
+// Start up the driver in a fresh state
+void TLC59116::enableTLC() {
+  writeToDevice(0x00, 0x80);
+}
+
+// Reset the driver either by the RESET pin, and if it was not defined just turn off all the LEDs.
+void TLC59116::resetDriver(){
+  for(int i=0; i<4; i++){
+    LEDOUT[i] = 0x00;
+  }
+
+  digitalWrite(RESET, LOW);
+  delay(1); // Allow a microsecond for the device to power down.
+  digitalWrite(RESET, HIGH);
+  enableTLC();
+}
+
+// Nice function to turn off all LED channels.
+void TLC59116::turnOffAllLEDs(){
+  for(byte i=0; i<16; i++){
+    LEDOff(i);
+  }
+}
+
 // Datasheet 9.3.5
-void TLC59116::softReset()
+void TLC59116::resetAllTLCs()
 {
   for (byte i = 0; i < 4; i++) LEDOUT[i] = 0x00;
 
