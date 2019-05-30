@@ -1,23 +1,23 @@
 # Syntax Coloring Map for Rob's Breakouts TLC59116 Library #
 
 # DataTypes (KEYWORD1)
-TLC59116 KEYWORD1
+TLC59116	KEYWORD1
 
 # Methods and Functions (KEYWORD2)
-LEDOff KEYWORD2
-LEDOn KEYWORD2
-LEDPWM KEYWORD2
-LEDGroup KEYWORD2
-setPWM KEYWORD2
-setGroupPWM KEYWORD2
-setGroupBlink KEYWORD2
-clearErrors KEYWORD2
-checkErrors KEYWORD2
-reportErrors KEYWORD2
-enableTLC KEYWORD2
-resetDriver KEYWORD2
-turnOffAllLEDs KEYWORD2
-resetAllTLCs KEYWORD2
+LEDOff	KEYWORD2
+LEDOn	KEYWORD2
+LEDPWM	KEYWORD2
+LEDGroup	KEYWORD2
+setPWM	KEYWORD2
+setGroupPWM	KEYWORD2
+setGroupBlink	KEYWORD2
+clearErrors	KEYWORD2
+checkErrors	KEYWORD2
+reportErrors	KEYWORD2
+enableTLC	KEYWORD2
+resetDriver	KEYWORD2
+turnOffAllLEDs	KEYWORD2
+resetAllTLCs	KEYWORD2
 
 # Structures (KEYWORD3)
 
